@@ -220,6 +220,12 @@ select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .savebar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:90;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
   background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.25);padding:10px 12px 10px 16px;max-width:calc(100vw - 32px)}
 .savebar b{color:var(--accent)}
+.perm-list{list-style:none;margin:10px 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto}
+.perm-list li{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)}
+.perm-list li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.perm-add{display:flex;gap:8px;margin-top:6px}
+.perm-add input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)}
+.perm-err{color:var(--danger);font-size:13px;min-height:18px;margin-top:4px}
 #printArea{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{
@@ -275,6 +281,7 @@ select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3m0 0-4 4m4-4 4 4M4 17v3h16v-3"/></svg>
       Atualizar base</button>
     <input type="file" id="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+    <button class="btn" id="btnPerms" hidden title="Quem pode importar a base"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 11l2 2 3.5-3.5"/></svg>Permissões</button>
     <button class="btn" id="btnTheme" title="Escolher tema de cores" aria-label="Escolher tema de cores" aria-haspopup="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
     <div class="who"><div class="avatar" id="avatar"></div><span class="nm" id="whoName"></span><button class="btn sm" id="btnLogout" title="Sair">Sair</button></div>
   </header>
@@ -284,7 +291,7 @@ select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
   <section class="empty" id="empty" hidden>
     <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13l4 4m0-4-4 4"/></svg>
     <h2>Nenhuma base de débitos carregada</h2>
-    <div>Clique em <b>Atualizar base</b> ou arraste a planilha <b>.xlsx / .xlsm</b> aqui.</div>
+    <div id="emptyHint">Clique em <b>Atualizar base</b> ou arraste a planilha <b>.xlsx / .xlsm</b> aqui.</div>
     <div style="margin-top:6px;font-size:13px">A base importada fica disponível para todos os usuários do dashboard.</div>
   </section>
 
@@ -380,6 +387,10 @@ const REPORT_COLS = ['Filial','Processo','Status Processo','Status NF','DT Ocorr
   'Valor Unitario','Valor Desconto','Valor Frete','Valor Total','DT Lançamento','Usuario Lançamento'];
 const TRAT = 'Local de Tratativa';
 const TRAT_OPTS = ['Retorno','Controle','Distribuição','Transportadora'];
+/* Quem pode importar a base (além de precisar de permissão de edição no claude.ai) */
+const DEFAULT_IMPORTERS = [{key:'rubens-cordeiro', name:'Rubens Cordeiro'}];
+const importers = () => Array.isArray(DATA.importers) && DATA.importers.length ? DATA.importers : DEFAULT_IMPORTERS;
+const canImport = () => !!me && importers().some(i => i.key === me.key);
 const ALL_COLS = [...REPORT_COLS.filter(c => c !== TRAT), 'Valor Debito'];
 const NUM_COLS = new Set(['Qtd','Valor Unitario','Valor Desconto','Valor Frete','Valor Total','Valor Debito']);
 const MONEY_COLS = new Set(['Valor Unitario','Valor Desconto','Valor Frete','Valor Total','Valor Debito']);
@@ -461,6 +472,7 @@ function pageStore(art){
     watchMeta(fn){ TRATS = DATA.trat || {}; setTimeout(() => fn(DATA.meta || null, {fromCache:false}), 0); return () => {}; },
     async loadRows(){ return DATA.rows || []; },
     async saveTrat(trat){ await publishData(Object.assign({}, DATA, {trat})); },
+    async savePerms(list){ await publishData(Object.assign({}, DATA, {importers: list})); },
     async saveBase(meta, rowsArr){
       meta.chunks = 1;
       meta.history = [{at: meta.updatedAt, by: meta.updatedBy, file: meta.fileName, rows: meta.rows, procs: meta.procs}, ...((DATA.meta && DATA.meta.history) || [])].slice(0, 20);
@@ -479,7 +491,8 @@ function localStore(){
     async getAccount(key){ return accts()[key] || null; },
     async createAccount(key, acc){ const a = accts(); if (a[key]) return false; a[key] = acc; lsSet('dd_accounts', a); return true; },
     async saveTrat(trat){ lsSet('dd_trat', trat); },
-    watchMeta(fn){ watcher = fn; TRATS = lsGet('dd_trat') || {}; const b = lsGet('dd_base'); setTimeout(() => fn(b ? b.meta : null, {fromCache:false}), 0); return () => {}; },
+    async savePerms(list){ DATA.importers = list; lsSet('dd_importers', list); },
+    watchMeta(fn){ watcher = fn; TRATS = lsGet('dd_trat') || {}; if (lsGet('dd_importers')) { DATA.importers = lsGet('dd_importers'); applyRole(); } const b = lsGet('dd_base'); setTimeout(() => fn(b ? b.meta : null, {fromCache:false}), 0); return () => {}; },
     async loadRows(){ const b = lsGet('dd_base'); return b ? b.rows : []; },
     async saveBase(meta, rowsArr){
       const old = lsGet('dd_base');
@@ -543,7 +556,7 @@ function startSession(u){
   me = u; lsSet('dd_session', u);
   $('#login').hidden = true; $('#main').hidden = false;
   $('#whoName').textContent = u.name; $('#avatar').textContent = initials(u.name); $('#avatar').title = u.name;
-  startData();
+  applyRole(); startData();
 }
 $('#btnLogout').onclick = () => { lsSet('dd_session', null); me = null; $('#main').hidden = true; $('#login').hidden = false; $('#lPass').value = ''; $('#lPass2').value = ''; setTab(false); };
 
@@ -596,8 +609,42 @@ $('#upd').onclick = () => {
 };
 
 /* ===================== Importação ===================== */
+function applyRole(){
+  const ok = canImport();
+  $('#btnImport').hidden = !ok; $('#btnPerms').hidden = !ok;
+  $('#emptyHint').innerHTML = ok ? 'Clique em <b>Atualizar base</b> ou arraste a planilha <b>.xlsx / .xlsm</b> aqui.'
+    : `Ainda não há base. Quem pode importar: <b>${esc(importers().map(i => i.name).join(', '))}</b>.`;
+}
+$('#btnPerms').onclick = () => {
+  let draft = importers().map(i => ({...i}));
+  const render = () => {
+    $('#permList').innerHTML = draft.map((i, n) => `<li><span>${esc(i.name)}${me && i.key === me.key ? ' <span class="muted">(você)</span>' : ''}</span><button class="btn sm" data-rm="${n}">Remover</button></li>`).join('');
+  };
+  modal(`<h3>Quem pode importar a base</h3>
+    <p>Só as pessoas desta lista veem o botão <b>Atualizar base</b>. Elas também precisam ter permissão de edição no claude.ai, dada pelo menu Compartilhar.</p>
+    <ul class="perm-list" id="permList"></ul>
+    <form class="perm-add" id="permForm"><input id="permName" placeholder="Nome completo da conta" aria-label="Nome completo"><button class="btn sm" type="submit">Adicionar</button></form>
+    <div class="perm-err" id="permErr" role="alert"></div>`,
+    [{label:'Cancelar'}, {label:'Salvar lista', cls:'primary', fn: async () => {
+      if (!draft.length) { toast('A lista precisa ter pelo menos uma pessoa.'); return; }
+      stashView();
+      try { await S.savePerms(draft); DATA.importers = draft; applyRole(); toast(S.mode === 'local' ? 'Lista salva.' : 'Lista salva. Atualizando a página para todos…', 5000); }
+      catch (ex) { console.error(ex); const c = ex && ex.code; try { sessionStorage.removeItem('dd_view'); } catch(_){}
+        toast(c && READONLY.has(c) ? 'Só quem tem permissão de edição no claude.ai pode salvar a lista.' : c === 'conflict' ? 'Outra pessoa salvou ao mesmo tempo. A página vai recarregar.' : 'Não foi possível salvar a lista agora.', 7000); }
+    }}]);
+  render();
+  $('#permList').onclick = e => { const b = e.target.closest('button[data-rm]'); if (!b) return; draft.splice(+b.dataset.rm, 1); render(); };
+  $('#permForm').onsubmit = e => {
+    e.preventDefault(); const name = $('#permName').value.trim().replace(/\s+/g,' '), key = nameKey(name);
+    $('#permErr').textContent = '';
+    if (name.split(' ').length < 2 || !key) { $('#permErr').textContent = 'Digite o nome completo (nome e sobrenome).'; return; }
+    if (draft.some(i => i.key === key)) { $('#permErr').textContent = 'Essa pessoa já está na lista.'; return; }
+    draft.push({key, name}); $('#permName').value = ''; render();
+  };
+};
 function readFile(file){
   if (!file) return;
+  if (!canImport()) { toast('Você não está na lista de quem pode importar a base.'); return; }
   const reader = new FileReader();
   reader.onload = e => {
     try { parseWorkbook(XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true}), file.name); }
@@ -1056,7 +1103,7 @@ document.addEventListener('click', e => { if (!$('#tmenu').contains(e.target) &&
 document.addEventListener('dragover', e => { e.preventDefault(); if (me) $('#empty').classList.add('over'); });
 document.addEventListener('dragleave', e => { if (!e.relatedTarget) $('#empty').classList.remove('over'); });
 document.addEventListener('drop', e => { e.preventDefault(); $('#empty').classList.remove('over'); const f = e.dataTransfer.files[0]; if (f && me) readFile(f); });
-$('#empty').onclick = () => $('#file').click(); $('#empty').style.cursor = 'pointer';
+$('#empty').onclick = () => { if (canImport()) $('#file').click(); }; $('#empty').style.cursor = 'pointer';
 
 /* ===================== Inicialização ===================== */
 async function boot(){
