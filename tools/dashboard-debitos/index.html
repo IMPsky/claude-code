@@ -66,6 +66,10 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:f
 .brand{display:flex;align-items:center;gap:12px;margin-right:auto;min-width:0;flex-wrap:wrap}
 .brand .logo{width:36px;height:36px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
 .brand h1{font-family:var(--f-display);font-size:21px;margin:0;font-weight:700;letter-spacing:.01em;white-space:nowrap}
+.ttl{display:flex;flex-direction:column;min-width:0}
+.credit{font-size:12px;color:var(--muted);line-height:1.2;white-space:nowrap}
+.credit b{color:var(--text);font-weight:600}
+.login .pitch .pcredit{margin-top:22px;font-size:14px;opacity:.85;padding-top:14px;border-top:1px solid rgba(255,255,255,.3);display:inline-block}
 .upd{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;padding:4px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted);min-width:0}
 .upd b{color:var(--text);font-weight:600}
 .upd .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
@@ -202,6 +206,7 @@ table.rep tfoot td{position:sticky;bottom:0;background:var(--surface-2);font-wei
     <div class="eyebrow">Controle de débitos · Transportes</div>
     <h1>Dashboard de Débitos</h1>
     <p>Processos de débito por transportador, motivo e status, com relatório filtrável e exportação para Excel.</p>
+    <div class="pcredit">Sistema criado por <b>Rubens Cordeiro de Souza</b></div>
   </div>
   <form class="lcard" id="loginForm" autocomplete="on" novalidate>
     <h2 id="lTitle">Entrar</h2>
@@ -224,7 +229,7 @@ table.rep tfoot td{position:sticky;bottom:0;background:var(--surface-2);font-wei
   <header class="top">
     <div class="brand">
       <div class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></div>
-      <h1>Dashboard de Débitos</h1>
+      <div class="ttl"><h1>Dashboard de Débitos</h1><div class="credit">Criado por <b>Rubens Cordeiro de Souza</b></div></div>
       <button class="upd none" id="upd" title="Ver histórico de atualizações" style="cursor:pointer"><span class="dot"></span><span id="updTxt">Nenhuma base importada</span></button>
     </div>
     <div class="search">
@@ -909,6 +914,10 @@ async function boot(){
   let db = null;
   if (window.claude && typeof window.claude.use === 'function') {
     try { [db, dl] = await Promise.all([window.claude.use('db'), window.claude.use('downloads')]); } catch(_) { db = null; dl = null; }
+  }
+  if (!db && window.claude && typeof window.claude.use === 'function') {
+    $('#lMode').innerHTML = '<b style="color:var(--danger)">Para acessar o dashboard, clique em “Entrar” no canto superior direito e faça login na sua conta claude.ai.</b> Depois recarregue esta página.';
+    $('#lSubmit').disabled = true; $('#login').hidden = false; return;
   }
   S = db ? cloudStore(db) : localStore();
   $('#lMode').textContent = S.mode === 'cloud'
