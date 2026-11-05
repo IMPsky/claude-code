@@ -31,6 +31,17 @@
   --t-aberto-bg:#3a2a0e;--t-aberto-fg:#f6c46a;--t-parcial-bg:#1b2b4d;--t-parcial-fg:#9dbcff;--t-rec-bg:#43201f;--t-rec-fg:#ff9d94;--t-conf-bg:#123a28;--t-conf-fg:#7fe0b0;
   color-scheme:dark;
 }
+/* ===== Temas de cor (cada tema redefine todos os tokens; contraste texto/fundo ≥ 4.5:1) ===== */
+:root{--ok-ink:#ffffff;--t-transp-bg:#efe8ff;--t-transp-fg:#5b3cc4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--t-transp-bg:#2c2350;--t-transp-fg:#c9b8ff}}
+:root[data-theme="dark"]{--t-transp-bg:#2c2350;--t-transp-fg:#c9b8ff}
+:root[data-palette="oceano"]{--bg:#0b1a2b;--veil:rgba(8,20,35,.88);--surface:#11253b;--surface-2:#17304b;--border:#27486a;--text:#e8f1fa;--muted:#a3bad0;--accent:#46c6d8;--accent-soft:#123a4c;--accent-ink:#04212a;--shadow:0 1px 2px rgba(0,0,0,.45);color-scheme:dark}
+:root[data-palette="floresta"]{--bg:#0d1a14;--veil:rgba(10,22,16,.88);--surface:#13241c;--surface-2:#1a3026;--border:#2c4a3c;--text:#e6f2ea;--muted:#a2bcad;--accent:#63d394;--accent-soft:#173a28;--accent-ink:#062312;--shadow:0 1px 2px rgba(0,0,0,.45);color-scheme:dark}
+:root[data-palette="vinho"]{--bg:#1c0f14;--veil:rgba(28,15,20,.88);--surface:#2a161d;--surface-2:#351c25;--border:#55303d;--text:#f6e9ee;--muted:#c9a7b3;--accent:#ff94ab;--accent-soft:#4a1f2d;--accent-ink:#2a0711;--shadow:0 1px 2px rgba(0,0,0,.45);color-scheme:dark}
+:root[data-palette="grafite"]{--bg:#141414;--veil:rgba(20,20,20,.88);--surface:#1f1f1f;--surface-2:#292929;--border:#3c3c3c;--text:#eeeeee;--muted:#ababab;--accent:#ff9d42;--accent-soft:#3a2a1a;--accent-ink:#1f1204;--shadow:0 1px 2px rgba(0,0,0,.5);color-scheme:dark}
+:root[data-palette="areia"]{--bg:#f4eee2;--veil:rgba(244,238,226,.84);--surface:#fffdf8;--surface-2:#f5efe3;--border:#e0d4bf;--text:#2b2418;--muted:#6b5f4c;--accent:#a94e1c;--accent-soft:#f8e5d6;--accent-ink:#ffffff;--shadow:0 1px 2px rgba(60,40,10,.08),0 2px 6px rgba(60,40,10,.06);color-scheme:light}
+:root[data-palette="lavanda"]{--bg:#f1eff9;--veil:rgba(241,239,249,.84);--surface:#ffffff;--surface-2:#f6f4fd;--border:#ddd8ef;--text:#1f1a33;--muted:#5f587a;--accent:#6447d6;--accent-soft:#ece7fd;--accent-ink:#ffffff;--shadow:0 1px 2px rgba(40,20,90,.07),0 2px 6px rgba(40,20,90,.06);color-scheme:light}
+:root[data-palette="menta"]{--bg:#ecf6f3;--veil:rgba(236,246,243,.84);--surface:#ffffff;--surface-2:#f1f9f7;--border:#cfe5df;--text:#13302b;--muted:#4b6a63;--accent:#0b7a6c;--accent-soft:#dcf3ee;--accent-ink:#ffffff;--shadow:0 1px 2px rgba(10,60,50,.07),0 2px 6px rgba(10,60,50,.06);color-scheme:light}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--f-body)}
@@ -82,7 +93,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:f
 .btn:hover{background:var(--surface-2)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.primary:hover{filter:brightness(1.07)}
-.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:var(--ok-ink)}
 .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
 .btn.block{width:100%;justify-content:center;padding:11px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -132,6 +143,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:f
 .kpi .kv{font-family:var(--f-display);font-size:32px;font-weight:700;margin:2px 0 0;font-variant-numeric:tabular-nums;line-height:1.1}
 .kpi .ks{font-size:12px;color:var(--muted);margin-bottom:6px}
 .kpi.hero .kv{font-size:46px}
+.kpi .kv.money{font-size:clamp(20px,1.9vw,27px);overflow-wrap:anywhere;line-height:1.15}
 .brk{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;overflow:auto;max-height:122px}
 .brk li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;cursor:pointer;border-radius:6px;padding:2px 4px}
 .brk li:hover{background:var(--surface-2)}
@@ -187,6 +199,27 @@ table.rep tfoot td{position:sticky;bottom:0;background:var(--surface-2);font-wei
 .hist li{padding:7px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:10px}
 .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 16px;border-radius:8px;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;max-width:calc(100vw - 32px);text-align:center}
 .toast.show{opacity:1}
+/* ===== Seletor de tema ===== */
+.tmenu{position:fixed;z-index:110;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.25);padding:6px;width:230px;max-width:calc(100vw - 16px)}
+.tmenu button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:8px 10px;border-radius:8px;cursor:pointer;text-align:left;color:var(--text)}
+.tmenu button:hover{background:var(--surface-2)}
+.tmenu button[aria-checked="true"]{background:var(--accent-soft);color:var(--text);font-weight:600}
+.tmenu .sw{display:inline-flex;border-radius:999px;overflow:hidden;border:1px solid var(--border);flex:none}
+.tmenu .sw i{width:12px;height:18px;display:block}
+.tmenu .tl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:6px 10px 4px;font-weight:700}
+/* ===== Local de Tratativa ===== */
+select.trat{appearance:none;-webkit-appearance:none;border:1px solid transparent;border-radius:999px;padding:2px 24px 2px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 12px) 55%,calc(100% - 8px) 55%;background-size:4px 4px;background-repeat:no-repeat}
+select.trat option{background:var(--surface);color:var(--text)}
+select.trat.tr-retorno{background-color:var(--t-parcial-bg);color:var(--t-parcial-fg)}
+select.trat.tr-controle{background-color:var(--t-aberto-bg);color:var(--t-aberto-fg)}
+select.trat.tr-distribuicao{background-color:var(--t-conf-bg);color:var(--t-conf-fg)}
+select.trat.tr-transportadora{background-color:var(--t-transp-bg);color:var(--t-transp-fg)}
+select.trat.tr-vazio{background-color:var(--surface-2);color:var(--muted)}
+select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.savebar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:90;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
+  background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.25);padding:10px 12px 10px 16px;max-width:calc(100vw - 32px)}
+.savebar b{color:var(--accent)}
 #printArea{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{
@@ -242,7 +275,7 @@ table.rep tfoot td{position:sticky;bottom:0;background:var(--surface-2);font-wei
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3m0 0-4 4m4-4 4 4M4 17v3h16v-3"/></svg>
       Atualizar base</button>
     <input type="file" id="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
-    <button class="btn" id="btnTheme" title="Alternar tema claro/escuro" aria-label="Alternar tema"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <button class="btn" id="btnTheme" title="Escolher tema de cores" aria-label="Escolher tema de cores" aria-haspopup="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
     <div class="who"><div class="avatar" id="avatar"></div><span class="nm" id="whoName"></span><button class="btn sm" id="btnLogout" title="Sair">Sair</button></div>
   </header>
 
@@ -314,6 +347,8 @@ table.rep tfoot td{position:sticky;bottom:0;background:var(--surface-2);font-wei
   <div class="pa"><button class="btn sm" id="popAll">Selecionar visíveis</button><button class="btn sm" id="popNone">Limpar</button></div>
   <ul id="popList"></ul>
 </div>
+<div class="savebar" id="savebar" hidden><span id="saveTxt"></span><button class="btn sm" id="btnDiscard">Descartar</button><button class="btn sm primary" id="btnSaveTrat">Salvar alterações</button></div>
+<div class="tmenu" id="tmenu" role="menu" hidden></div>
 <div id="modalHost"></div>
 <div id="printArea"></div>
 <div class="toast" id="toast" role="status"></div>
@@ -341,15 +376,17 @@ const READONLY = new Set(['not_writer','not_granted','capability_disabled','capa
 
 /* ===================== Configuração ===================== */
 const REPORT_COLS = ['Filial','Processo','Status Processo','Status NF','DT Ocorrência','Subcontratada','Seguradora','Seguro Via',
-  'Tipo Processo','Motivo','Tipo Operação','Setor','Transportador','Placa','NF Origem','Item','Descrição','Qtd',
+  'Tipo Processo','Motivo','Tipo Operação','Setor','Local de Tratativa','Transportador','Placa','NF Origem','Item','Descrição','Qtd',
   'Valor Unitario','Valor Desconto','Valor Frete','Valor Total','DT Lançamento','Usuario Lançamento'];
-const ALL_COLS = [...REPORT_COLS, 'Valor Debito'];
+const TRAT = 'Local de Tratativa';
+const TRAT_OPTS = ['Retorno','Controle','Distribuição','Transportadora'];
+const ALL_COLS = [...REPORT_COLS.filter(c => c !== TRAT), 'Valor Debito'];
 const NUM_COLS = new Set(['Qtd','Valor Unitario','Valor Desconto','Valor Frete','Valor Total','Valor Debito']);
 const MONEY_COLS = new Set(['Valor Unitario','Valor Desconto','Valor Frete','Valor Total','Valor Debito']);
 const DATE_COLS = new Set(['DT Ocorrência','DT Lançamento']);
 const KPI_DIMS = [['Status Processo','var(--c2)'],['Status NF','var(--c3)'],['Tipo Processo','var(--c5)'],['Motivo','var(--c4)'],
-  ['Tipo Operação','var(--c6)'],['Setor','var(--c7)'],['Transportador','var(--c8)']];
-const GROUP_OPTS = ['Transportador','Status Processo','Status NF','Tipo Processo','Motivo','Tipo Operação','Setor','DT Lançamento','Usuario Lançamento'];
+  ['Tipo Operação','var(--c6)'],['Setor','var(--c7)'],[TRAT,'var(--c1)'],['Transportador','var(--c8)']];
+const GROUP_OPTS = ['Transportador','Status Processo','Status NF','Tipo Processo','Motivo','Tipo Operação','Setor',TRAT,'DT Lançamento','Usuario Lançamento'];
 const PALETTE = ['#1f5fd1','#0e9c9a','#e09310','#d6456f','#7357e8','#5c9a2e','#e0662e','#46607f','#14a3d6','#b04fc2','#8d98aa'];
 const CHUNK_CHARS = 150000;
 
@@ -421,12 +458,16 @@ function pageStore(art){
       }
       const l = lsGet('dd_accounts') || {}; l[key] = acc; lsSet('dd_accounts', l); return 'local';
     },
-    watchMeta(fn){ setTimeout(() => fn(DATA.meta || null, {fromCache:false}), 0); return () => {}; },
+    watchMeta(fn){ TRATS = DATA.trat || {}; setTimeout(() => fn(DATA.meta || null, {fromCache:false}), 0); return () => {}; },
     async loadRows(){ return DATA.rows || []; },
+    async saveTrat(trat){ await publishData(Object.assign({}, DATA, {trat})); },
     async saveBase(meta, rowsArr){
       meta.chunks = 1;
       meta.history = [{at: meta.updatedAt, by: meta.updatedBy, file: meta.fileName, rows: meta.rows, procs: meta.procs}, ...((DATA.meta && DATA.meta.history) || [])].slice(0, 20);
-      await publishData(Object.assign({}, DATA, {meta, rows: rowsArr}));
+      stashView();
+      const trat = Object.assign({}, DATA.trat || {}); const at = new Date().toISOString();
+      for (const p in PENDING) trat[p] = {v: PENDING[p], by: me ? me.name : '', at};
+      await publishData(Object.assign({}, DATA, {meta, rows: rowsArr, trat}));
     }
   };
 }
@@ -437,7 +478,8 @@ function localStore(){
     mode:'local',
     async getAccount(key){ return accts()[key] || null; },
     async createAccount(key, acc){ const a = accts(); if (a[key]) return false; a[key] = acc; lsSet('dd_accounts', a); return true; },
-    watchMeta(fn){ watcher = fn; const b = lsGet('dd_base'); setTimeout(() => fn(b ? b.meta : null, {fromCache:false}), 0); return () => {}; },
+    async saveTrat(trat){ lsSet('dd_trat', trat); },
+    watchMeta(fn){ watcher = fn; TRATS = lsGet('dd_trat') || {}; const b = lsGet('dd_base'); setTimeout(() => fn(b ? b.meta : null, {fromCache:false}), 0); return () => {}; },
     async loadRows(){ const b = lsGet('dd_base'); return b ? b.rows : []; },
     async saveBase(meta, rowsArr){
       const old = lsGet('dd_base');
@@ -533,7 +575,16 @@ function renderStamp(){
   $('#updTxt').innerHTML = `Atualizado em <b>${esc(fmtStamp(META.updatedAt))}</b> por <b>${esc(META.updatedBy)}</b>`;
 }
 function showState(s){ $('#loading').hidden = s !== 'loading'; $('#empty').hidden = s !== 'empty'; $('#app').hidden = s !== 'app'; }
-function enrich(o){ o._dl = dateKey(o['DT Lançamento']); o._s = norm(REPORT_COLS.map(c => o[c]).join(' | ')); return o; }
+/* Local de Tratativa: valor salvo por processo; sem valor salvo, vem do Setor */
+let TRATS = {};          // processo -> {v, by, at}
+const PENDING = {};      // processo -> valor ainda não salvo
+const tratKey = v => norm(v).replace(/[^a-z]/g,'');
+const TRAT_BY_KEY = Object.fromEntries(TRAT_OPTS.map(o => [tratKey(o), o]));
+function tratFor(o){ const p = String(o['Processo']);
+  if (PENDING[p]) return PENDING[p];
+  if (TRATS[p] && TRATS[p].v) return TRATS[p].v;
+  return TRAT_BY_KEY[tratKey(o['Setor'])] || 'Retorno'; }
+function enrich(o){ o[TRAT] = tratFor(o); o._dl = dateKey(o['DT Lançamento']); o._s = norm(REPORT_COLS.map(c => o[c]).join(' | ')); return o; }
 
 $('#upd').onclick = () => {
   if (!META) return;
@@ -601,7 +652,7 @@ async function upload(arr, name, sheet, procs){
 
 function setData(rows, keepFilters){
   ROWS = rows;
-  if (!keepFilters) { for (const k in filters) delete filters[k]; dateFrom = dateTo = ''; query = ''; $('#q').value = ''; page = 0; buildFilterUI(); }
+  if (!keepFilters) { for (const k in filters) delete filters[k]; dateFrom = dateTo = ''; query = ''; $('#q').value = ''; page = 0; buildFilterUI(); restoreView(); }
   showState('app'); refresh();
 }
 
@@ -695,7 +746,7 @@ $('#popAll').onclick = () => { const s = filters[popCol] || (filters[popCol] = n
 $('#popNone').onclick = () => { delete filters[popCol]; page = 0; refresh(true); renderPopList(); };
 document.addEventListener('click', e => { if (!$('#pop').contains(e.target)) closePop(); });
 addEventListener('resize', closePop);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePop(); $('#modalHost').innerHTML = ''; } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePop(); $('#modalHost').innerHTML = ''; $('#tmenu').hidden = true; } });
 function toggleFilter(col, val){
   val = String(val); const s = filters[col];
   if (s && s.size === 1 && s.has(val)) delete filters[col]; else filters[col] = new Set([val]);
@@ -735,9 +786,9 @@ function renderKPIs(){
     </div>`;
   }
   const vt = sum(rows,'Valor Total');
-  html += `<div class="kpi wide" style="--kc:var(--ok)">
+  html += `<div class="kpi" style="--kc:var(--ok)">
       <div class="kt">Valor Total</div>
-      <div class="kv">${fmtMoney(vt)}</div>
+      <div class="kv money">${fmtMoney(vt)}</div>
       <div class="ks">média por processo: ${fmtMoney(total ? vt/total : 0)}</div>
       <div class="mini">
         <div>Valor Débito<b>${fmtMoney(sum(rows,'Valor Debito'))}</b></div>
@@ -780,7 +831,7 @@ function renderCharts(){
         ctx.fillStyle = cssVar('--text'); ctx.font = '600 11.5px "Source Sans 3", system-ui'; ctx.fillText(fmtInt(data[i]), b.x, b.y-5);
         const d = daysSince(keys[i]); if (d == null) return;
         const h = b.base - b.y, w = b.width;
-        if (h >= 34 && w >= 24) { ctx.fillStyle = '#fff'; ctx.font = '700 12px "Barlow Semi Condensed", system-ui'; ctx.fillText(fmtInt(d), b.x, b.base - 18);
+        if (h >= 34 && w >= 24) { ctx.fillStyle = cssVar('--accent-ink'); ctx.font = '700 12px "Barlow Semi Condensed", system-ui'; ctx.fillText(fmtInt(d), b.x, b.base - 18);
           ctx.font = '600 9.5px "Source Sans 3", system-ui'; ctx.fillText(d === 1 ? 'dia' : 'dias', b.x, b.base - 7); }
       }); ctx.restore(); }}]
   });
@@ -826,12 +877,63 @@ function sortedRows(){
 function tagFor(v){ const n = norm(v);
   const cls = n.includes('aberto') ? 't-aberto' : n.includes('parcial') ? 't-parcial' : n.includes('recus') ? 't-recusado' : n.includes('confer') ? 't-conf' : '';
   return `<span class="tag ${cls}">${esc(v)}</span>`; }
-function cellHtml(c, v){
+function cellHtml(c, v, row){
   if (MONEY_COLS.has(c)) return `<td class="num">${fmtMoney(v)}</td>`;
   if (NUM_COLS.has(c)) return `<td class="num">${fmtNum(v)}</td>`;
   if (c === 'Status Processo' || c === 'Status NF') return `<td>${v ? tagFor(v) : ''}</td>`;
   if (c === 'Descrição') return `<td class="desc" title="${esc(v)}">${esc(v)}</td>`;
+  if (c === TRAT) return `<td>${tratSelect(row)}</td>`;
   return `<td>${esc(v)}</td>`;
+}
+function tratSelect(r){
+  const p = String(r['Processo']), v = r[TRAT], saved = TRATS[p], pend = PENDING[p] != null;
+  const tip = pend ? 'Alteração ainda não salva' : saved ? `Alterado por ${saved.by} em ${fmtStamp(saved.at)}` : 'Valor inicial (coluna Setor)';
+  return `<select class="trat tr-${tratKey(v) || 'vazio'}${pend ? ' pend' : ''}" data-proc="${esc(p)}" title="${esc(tip)}" aria-label="Local de Tratativa do processo ${esc(p)}">${
+    TRAT_OPTS.map(o => `<option${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+}
+$('#rep').addEventListener('change', e => {
+  const sel = e.target.closest('select.trat'); if (!sel) return;
+  const p = sel.dataset.proc, v = sel.value;
+  const base = TRATS[p] && TRATS[p].v ? TRATS[p].v : null;
+  const orig = base || (ROWS.find(r => String(r['Processo']) === p) || {})['Setor'];
+  if (v === (base || TRAT_BY_KEY[tratKey(orig)] || 'Retorno')) delete PENDING[p]; else PENDING[p] = v;
+  ROWS.forEach(r => { if (String(r['Processo']) === p) enrich(r); });
+  refresh(); updateSavebar();
+});
+function updateSavebar(){
+  const n = Object.keys(PENDING).length;
+  $('#savebar').hidden = !n;
+  $('#saveTxt').innerHTML = `<b>${n}</b> ${n === 1 ? 'processo alterado' : 'processos alterados'} em Local de Tratativa`;
+}
+$('#btnDiscard').onclick = () => { for (const k in PENDING) delete PENDING[k]; ROWS.forEach(enrich); refresh(); updateSavebar(); };
+$('#btnSaveTrat').onclick = async () => {
+  const btn = $('#btnSaveTrat'); btn.disabled = true;
+  const at = new Date().toISOString(), next = Object.assign({}, TRATS);
+  for (const p in PENDING) next[p] = {v: PENDING[p], by: me ? me.name : '', at};
+  stashView();
+  try {
+    await S.saveTrat(next);
+    TRATS = next; for (const k in PENDING) delete PENDING[k]; ROWS.forEach(enrich); refresh(); updateSavebar();
+    toast(S.mode === 'local' ? 'Alterações salvas.' : 'Alterações salvas. Atualizando a página para todos…', 5000);
+  } catch (ex) {
+    console.error(ex); const c = ex && ex.code;
+    try { sessionStorage.removeItem('dd_view'); } catch(_){}
+    toast(c && READONLY.has(c) ? 'Só quem tem permissão de edição neste dashboard (e está logado no claude.ai) pode salvar alterações.'
+      : c === 'conflict' ? 'Outra pessoa salvou ao mesmo tempo. A página vai recarregar; refaça as alterações.'
+      : c === 'rate_limited' ? 'Muitas gravações seguidas. Aguarde um minuto e tente de novo.'
+      : 'Não foi possível salvar agora. Tente de novo em instantes.', 7000);
+  } finally { btn.disabled = false; }
+};
+/* Mantém filtros e página depois que a página recarrega com os dados novos */
+function stashView(){
+  try { sessionStorage.setItem('dd_view', JSON.stringify({filters: Object.fromEntries(Object.entries(filters).map(([k,v]) => [k, [...v]])), dateFrom, dateTo, q: $('#q').value, sort, page, y: scrollY})); } catch(_){}
+}
+function restoreView(){
+  let v = null; try { v = JSON.parse(sessionStorage.getItem('dd_view') || 'null'); sessionStorage.removeItem('dd_view'); } catch(_){}
+  if (!v) return;
+  for (const k in v.filters || {}) filters[k] = new Set(v.filters[k]);
+  dateFrom = v.dateFrom || ''; dateTo = v.dateTo || ''; $('#q').value = v.q || ''; query = norm(v.q || ''); sort = v.sort || sort; page = v.page || 0;
+  setTimeout(() => scrollTo(0, v.y || 0), 50);
 }
 const footVals = rows => REPORT_COLS.map((c,i) => i === 0 ? 'Totais' : c === 'Processo' ? `${fmtInt(uniqProc(rows))} proc.`
   : MONEY_COLS.has(c) && c !== 'Valor Unitario' ? fmtMoney(sum(rows,c)) : c === 'Qtd' ? fmtNum(sum(rows,c)) : '');
@@ -841,7 +943,7 @@ function renderTable(){
   const slice = ps ? rows.slice(page*ps, page*ps+ps) : rows;
   const head = REPORT_COLS.map(c => `<th data-col="${esc(c)}" class="${NUM_COLS.has(c) ? 'num' : ''}">${esc(c)}<span class="s">${sort.col === c ? (sort.dir > 0 ? '▲' : '▼') : '↕'}</span></th>`).join('');
   $('#rep').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${
-    slice.map(r => `<tr>${REPORT_COLS.map(c => cellHtml(c, r[c])).join('')}</tr>`).join('') ||
+    slice.map(r => `<tr>${REPORT_COLS.map(c => cellHtml(c, r[c], r)).join('')}</tr>`).join('') ||
     `<tr><td colspan="${REPORT_COLS.length}" class="muted" style="padding:20px;text-align:center">Nenhum registro para os filtros selecionados</td></tr>`
   }</tbody><tfoot><tr>${footVals(rows).map((v,i) => `<td class="${NUM_COLS.has(REPORT_COLS[i]) ? 'num' : ''}">${esc(v)}</td>`).join('')}</tr></tfoot>`;
   $('#repInfo').textContent = `${fmtInt(rows.length)} linhas · ${fmtInt(uniqProc(rows))} processos`;
@@ -903,7 +1005,7 @@ $('#btnPrint').onclick = () => {
     body: rows.map(r => REPORT_COLS.map(c => MONEY_COLS.has(c) ? fmtMoney(r[c]) : NUM_COLS.has(c) ? fmtNum(r[c]) : String(r[c] ?? ''))),
     styles:{fontSize:5.2, cellPadding:0.8, overflow:'linebreak', lineColor:[200,205,212], lineWidth:0.1},
     headStyles:{fillColor:[31,95,209], textColor:255, fontSize:5.2}, footStyles:{fillColor:[235,238,243], textColor:20},
-    columnStyles:{...numIdx, 16:{cellWidth:30}},
+    columnStyles:{...numIdx, [REPORT_COLS.indexOf('Descrição')]:{cellWidth:28}},
     didDrawPage: d => { doc.setFontSize(6.5); doc.text(`Página ${d.pageNumber}`, 290, 205, {align:'right'}); }
   });
   const name = stampName('pdf');
@@ -918,13 +1020,39 @@ $('#file').onchange = e => { readFile(e.target.files[0]); e.target.value = ''; }
 $('#btnClear').onclick = () => { for (const k in filters) delete filters[k]; dateFrom = dateTo = ''; query = ''; $('#q').value = ''; page = 0; refresh(); };
 $('#btnToggleFilters').onclick = e => { const f = $('#filters'); f.classList.toggle('collapsed'); e.target.textContent = f.classList.contains('collapsed') ? 'Expandir' : 'Recolher'; lsSet('dd_fcollapsed', f.classList.contains('collapsed')); };
 if (lsGet('dd_fcollapsed')) { $('#filters').classList.add('collapsed'); $('#btnToggleFilters').textContent = 'Expandir'; }
-$('#btnTheme').onclick = () => {
-  const root = document.documentElement;
-  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  root.dataset.theme = dark ? 'light' : 'dark'; lsSet('dd_theme', root.dataset.theme);
+const THEMES = [
+  {id:'auto', name:'Automático', sw:['#eef1f5','#18202a','#1f5fd1']},
+  {id:'claro', name:'Claro', theme:'light', sw:['#eef1f5','#ffffff','#1f5fd1']},
+  {id:'escuro', name:'Escuro', theme:'dark', sw:['#0f141b','#18202a','#6d9cff']},
+  {id:'areia', name:'Areia', theme:'light', sw:['#f4eee2','#fffdf8','#a94e1c']},
+  {id:'lavanda', name:'Lavanda', theme:'light', sw:['#f1eff9','#ffffff','#6447d6']},
+  {id:'menta', name:'Menta', theme:'light', sw:['#ecf6f3','#ffffff','#0b7a6c']},
+  {id:'oceano', name:'Oceano', theme:'dark', sw:['#0b1a2b','#11253b','#46c6d8']},
+  {id:'floresta', name:'Floresta', theme:'dark', sw:['#0d1a14','#13241c','#63d394']},
+  {id:'vinho', name:'Vinho', theme:'dark', sw:['#1c0f14','#2a161d','#ff94ab']},
+  {id:'grafite', name:'Grafite', theme:'dark', sw:['#141414','#1f1f1f','#ff9d42']}
+];
+function applyTheme(id){
+  const t = THEMES.find(x => x.id === id) || THEMES[0], root = document.documentElement;
+  if (t.theme) root.dataset.theme = t.theme; else delete root.dataset.theme;
+  if (t.theme && !['claro','escuro'].includes(t.id)) root.dataset.palette = t.id; else delete root.dataset.palette;
+  lsSet('dd_palette', t.id);
   if (ROWS.length) renderCharts();
+}
+function renderThemeMenu(){
+  const cur = lsGet('dd_palette') || 'auto';
+  $('#tmenu').innerHTML = '<div class="tl">Tema de cores</div>' + THEMES.map(t => `<button role="menuitemradio" aria-checked="${t.id === cur}" data-id="${t.id}"><span class="sw">${t.sw.map(c => `<i style="background:${c}"></i>`).join('')}</span>${esc(t.name)}</button>`).join('');
+}
+$('#btnTheme').onclick = e => {
+  e.stopPropagation(); const m = $('#tmenu');
+  if (!m.hidden) { m.hidden = true; return; }
+  renderThemeMenu(); m.hidden = false;
+  const r = $('#btnTheme').getBoundingClientRect();
+  m.style.top = (r.bottom + 6) + 'px'; m.style.left = Math.max(8, Math.min(r.right - m.offsetWidth, innerWidth - m.offsetWidth - 8)) + 'px';
 };
-{ const t = lsGet('dd_theme'); if (t) document.documentElement.dataset.theme = t; }
+$('#tmenu').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (!b) return; applyTheme(b.dataset.id); renderThemeMenu(); });
+document.addEventListener('click', e => { if (!$('#tmenu').contains(e.target) && e.target !== $('#btnTheme')) $('#tmenu').hidden = true; });
+{ const t = lsGet('dd_palette'); if (t) applyTheme(t); else { const o = lsGet('dd_theme'); if (o) applyTheme(o === 'dark' ? 'escuro' : 'claro'); } }
 document.addEventListener('dragover', e => { e.preventDefault(); if (me) $('#empty').classList.add('over'); });
 document.addEventListener('dragleave', e => { if (!e.relatedTarget) $('#empty').classList.remove('over'); });
 document.addEventListener('drop', e => { e.preventDefault(); $('#empty').classList.remove('over'); const f = e.dataTransfer.files[0]; if (f && me) readFile(f); });
