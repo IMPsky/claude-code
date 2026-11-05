@@ -249,20 +249,10 @@ select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
     <p>Processos de débito por transportador, motivo e status, com relatório filtrável e exportação para Excel.</p>
     <div class="pcredit">Sistema criado por <b>Rubens Cordeiro de Souza</b></div>
   </div>
-  <form class="lcard" id="loginForm" autocomplete="on" novalidate>
-    <h2 id="lTitle">Entrar</h2>
-    <div class="muted" id="lSub">Use seu nome completo e a senha cadastrada.</div>
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" id="tabLogin" aria-selected="true">Entrar</button>
-      <button type="button" role="tab" id="tabSignup" aria-selected="false">Criar conta</button>
-    </div>
-    <div class="fld"><label for="lName">Nome completo</label><input id="lName" autocomplete="username" placeholder="Ex.: Maria Aparecida Souza" required></div>
-    <div class="fld"><label for="lPass">Senha</label><input id="lPass" type="password" autocomplete="current-password" placeholder="Mínimo 4 caracteres" required></div>
-    <div class="fld" id="fldPass2" hidden><label for="lPass2">Confirmar senha</label><input id="lPass2" type="password" autocomplete="new-password"></div>
-    <div class="lerr" id="lErr" role="alert"></div>
-    <button class="btn primary block" id="lSubmit" type="submit">Entrar</button>
-    <div class="lnote" id="lMode"></div>
-  </form>
+  <div class="lcard" id="gate">
+    <h2>Acesso</h2>
+    <p class="muted" id="gateMsg" style="margin:8px 0 0">Carregando…</p>
+  </div>
 </section>
 
 <!-- ===== Dashboard ===== -->
@@ -283,7 +273,7 @@ select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
     <input type="file" id="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
     <button class="btn" id="btnPerms" hidden title="Quem pode importar a base"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 11l2 2 3.5-3.5"/></svg>Permissões</button>
     <button class="btn" id="btnTheme" title="Escolher tema de cores" aria-label="Escolher tema de cores" aria-haspopup="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
-    <div class="who"><div class="avatar" id="avatar"></div><span class="nm" id="whoName"></span><button class="btn sm" id="btnLogout" title="Sair">Sair</button></div>
+    <div class="who"><div class="avatar" id="avatar"></div><span class="nm" id="whoName"></span></div>
   </header>
 
   <section class="loading" id="loading">Carregando a base compartilhada…</section>
@@ -388,9 +378,9 @@ const REPORT_COLS = ['Filial','Processo','Status Processo','Status NF','DT Ocorr
 const TRAT = 'Local de Tratativa';
 const TRAT_OPTS = ['Retorno','Controle','Distribuição','Transportadora'];
 /* Quem pode importar a base (além de precisar de permissão de edição no claude.ai) */
-const DEFAULT_IMPORTERS = [{key:'rubens-cordeiro', name:'Rubens Cordeiro'}];
-const importers = () => Array.isArray(DATA.importers) && DATA.importers.length ? DATA.importers : DEFAULT_IMPORTERS;
-const canImport = () => !!me && importers().some(i => i.key === me.key);
+/* O dono do dashboard sempre pode; os demais, se estiverem na lista que o dono mantém */
+const importers = () => Array.isArray(DATA.importers) ? DATA.importers.filter(i => i && i.id) : [];
+const canImport = () => !!me && !!me.id && (me.isOwner || importers().some(i => i.id === me.id));
 const ALL_COLS = [...REPORT_COLS.filter(c => c !== TRAT), 'Valor Debito'];
 const NUM_COLS = new Set(['Qtd','Valor Unitario','Valor Desconto','Valor Frete','Valor Total','Valor Debito']);
 const MONEY_COLS = new Set(['Valor Unitario','Valor Desconto','Valor Frete','Valor Total','Valor Debito']);
@@ -444,15 +434,6 @@ const daysTxt = d => d == null ? '' : d === 1 ? '1 dia' : `${fmtInt(d)} dias`;
 const cell = v => (v == null ? '' : String(v).trim());
 const display = (col, v) => v === '' ? '(vazio)' : (MONEY_COLS.has(col) ? fmtMoney(+v) : NUM_COLS.has(col) ? fmtNum(+v) : String(v));
 
-/* ===================== Senhas (PBKDF2) ===================== */
-const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
-async function hashPass(pass, saltB64){
-  const salt = saltB64 ? Uint8Array.from(atob(saltB64), c => c.charCodeAt(0)) : crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({name:'PBKDF2', hash:'SHA-256', salt, iterations:150000}, key, 256);
-  return {salt: b64(salt), hash: b64(bits)};
-}
-
 /* ===================== Armazenamento ===================== */
 function cloudStore(db){
   const safeId = v => String(v).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_').slice(0, 180) || '_';
@@ -470,11 +451,11 @@ function cloudStore(db){
     watchMeta(fn, err){
       db.collection('trat').onSnapshot(snap => {
         const m = {}; snap.docs.forEach(d => { const x = d.data(); if (x && x.p != null) m[String(x.p)] = x; });
-        TRATS = m; if (ROWS.length) { ROWS.forEach(enrich); refresh(true); }
+        TRATS = m; if (ROWS.length) { ROWS.forEach(enrich); refresh(true); } refreshNames();
       }, e => console.error(e));
       db.doc('state/importers').onSnapshot(d => {
         const x = d.exists ? d.data() : null;
-        DATA.importers = x && Array.isArray(x.list) ? x.list : undefined; if (me) applyRole();
+        DATA.importers = x && Array.isArray(x.list) ? x.list : undefined; if (me) applyRole(); refreshNames();
       }, e => console.error(e));
       return db.doc('base/meta').onSnapshot(d => fn(d.exists ? d.data() : null, d.metadata), err);
     },
@@ -529,61 +510,25 @@ function localStore(){
   };
 }
 
-/* ===================== Acesso (login / criar conta) ===================== */
-let signup = false;
-function setTab(isSignup){
-  signup = isSignup;
-  $('#tabLogin').setAttribute('aria-selected', String(!isSignup));
-  $('#tabSignup').setAttribute('aria-selected', String(isSignup));
-  $('#fldPass2').hidden = !isSignup;
-  $('#lTitle').textContent = isSignup ? 'Criar conta' : 'Entrar';
-  $('#lSub').textContent = isSignup ? 'Só precisa do seu nome completo e de uma senha.' : 'Use seu nome completo e a senha cadastrada.';
-  $('#lSubmit').textContent = isSignup ? 'Criar conta e entrar' : 'Entrar';
-  $('#lPass').autocomplete = isSignup ? 'new-password' : 'current-password';
-  $('#lErr').textContent = '';
+/* ===================== Identidade (conta claude.ai) ===================== */
+let USER = null;
+const NAMES = {};
+const who = id => (id && NAMES[id]) || (me && id === me.id ? me.name : '') || 'Alguém';
+async function resolveNames(ids){
+  const need = [...new Set(ids.filter(Boolean))].filter(i => !NAMES[i]);
+  if (!need.length || !USER) return;
+  try { const ps = await USER.profiles(need); for (const i of need) if (ps[i] && ps[i].name) NAMES[i] = ps[i].name; } catch(_){}
 }
-$('#tabLogin').onclick = () => setTab(false);
-$('#tabSignup').onclick = () => setTab(true);
-$('#loginForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const name = $('#lName').value.trim().replace(/\s+/g,' '), pass = $('#lPass').value, err = $('#lErr'), btn = $('#lSubmit');
-  err.textContent = '';
-  if (name.split(' ').length < 2) { err.textContent = 'Digite seu nome completo (nome e sobrenome).'; return; }
-  if (pass.length < 4) { err.textContent = 'A senha precisa ter pelo menos 4 caracteres.'; return; }
-  const key = nameKey(name);
-  if (!key) { err.textContent = 'Use letras no nome.'; return; }
-  btn.disabled = true; const label = btn.textContent; btn.textContent = 'Aguarde…';
-  try {
-    if (signup) {
-      if (pass !== $('#lPass2').value) { err.textContent = 'As senhas não conferem.'; return; }
-      if (await S.getAccount(key)) { err.textContent = 'Já existe uma conta com esse nome. Use a aba Entrar.'; return; }
-      const h = await hashPass(pass);
-      const ok = await S.createAccount(key, {name, salt: h.salt, hash: h.hash, createdAt: new Date().toISOString()});
-      if (!ok) { err.textContent = 'Já existe uma conta com esse nome. Use a aba Entrar.'; return; }
-      startSession({key, name});
-      toast(ok === 'local' ? `Conta criada neste navegador. Bem-vindo(a), ${name.split(' ')[0]}!` : `Conta criada. Bem-vindo(a), ${name.split(' ')[0]}!`, 4500);
-    } else {
-      const acc = await S.getAccount(key);
-      if (!acc) { err.textContent = 'Nenhuma conta com esse nome. Confira o nome ou crie uma conta.'; return; }
-      const h = await hashPass(pass, acc.salt);
-      if (h.hash !== acc.hash) { err.textContent = 'Senha incorreta.'; return; }
-      startSession({key, name: acc.name});
-    }
-  } catch (ex) {
-    console.error(ex);
-    err.textContent = ex && ex.code === 'conflict' ? 'Outra pessoa salvou ao mesmo tempo. A página vai recarregar; tente de novo em seguida.'
-      : ex && ex.code === 'rate_limited' ? 'Muitas alterações seguidas. Aguarde um minuto e tente de novo.'
-      : ex && ex.code === 'quota_exceeded' ? 'O armazenamento do dashboard está cheio. Avise o responsável.'
-      : 'Não foi possível criar a conta. Verifique se você tem acesso de edição a este dashboard no claude.ai.';
-  } finally { btn.disabled = false; btn.textContent = label; }
-});
+async function refreshNames(){
+  await resolveNames([META && META.updatedBy, ...((META && META.history) || []).map(h => h.by), ...Object.values(TRATS).map(t => t.by), ...importers().map(i => i.id)]);
+  renderStamp(); if (ROWS.length) renderTable();
+}
 function startSession(u){
-  me = u; lsSet('dd_session', u);
+  me = u; if (u.id) NAMES[u.id] = u.name;
   $('#login').hidden = true; $('#main').hidden = false;
-  $('#whoName').textContent = u.name; $('#avatar').textContent = initials(u.name); $('#avatar').title = u.name;
+  $('#whoName').textContent = u.name; $('#avatar').textContent = initials(u.name || '?') || '?'; $('#avatar').title = u.name;
   applyRole(); startData();
 }
-$('#btnLogout').onclick = () => { lsSet('dd_session', null); me = null; $('#main').hidden = true; $('#login').hidden = false; $('#lPass').value = ''; $('#lPass2').value = ''; setTab(false); };
 
 /* ===================== Base compartilhada ===================== */
 let unwatch = null, loadedVersion = null, metaTimer = null;
@@ -602,7 +547,8 @@ function startData(){
       const rows = arr.map(a => { const o = {}; ALL_COLS.forEach(c => { const i = cols.indexOf(c); o[c] = i < 0 ? (NUM_COLS.has(c) ? 0 : '') : a[i]; }); return enrich(o); });
       const first = !ROWS.length;
       setData(rows, !first);
-      if (!first && meta.updatedBy !== (me && me.name)) toast(`Base atualizada por ${meta.updatedBy}`);
+      refreshNames();
+      if (!first && meta.updatedBy !== (me && me.id)) toast(`Base atualizada por ${who(meta.updatedBy)}`);
     } catch (ex) { console.error(ex); toast(ex.message || 'Não foi possível carregar a base.'); }
   }, e => { clearTimeout(metaTimer); console.error(e); $('#loading').textContent = 'Não foi possível acessar a base compartilhada neste acesso.'; });
 }
@@ -610,7 +556,7 @@ function renderStamp(){
   const b = $('#upd');
   if (!META) { b.classList.add('none'); $('#updTxt').textContent = 'Nenhuma base importada'; return; }
   b.classList.remove('none');
-  $('#updTxt').innerHTML = `Atualizado em <b>${esc(fmtStamp(META.updatedAt))}</b> por <b>${esc(META.updatedBy)}</b>`;
+  $('#updTxt').innerHTML = `Atualizado em <b>${esc(fmtStamp(META.updatedAt))}</b> por <b>${esc(who(META.updatedBy))}</b>`;
 }
 function showState(s){ $('#loading').hidden = s !== 'loading'; $('#empty').hidden = s !== 'empty'; $('#app').hidden = s !== 'app'; }
 /* Local de Tratativa: valor salvo por processo; sem valor salvo, vem do Setor */
@@ -629,43 +575,48 @@ $('#upd').onclick = () => {
   const h = META.history || [];
   modal(`<h3>Histórico de atualizações</h3>
     <p>Arquivo atual: <b>${esc(META.fileName)}</b> · ${fmtInt(META.rows)} linhas · ${fmtInt(META.procs || 0)} processos</p>
-    <ul class="hist">${h.map(x => `<li><span><b>${esc(x.by)}</b><br><span class="muted">${esc(x.file)}</span></span><span class="muted" style="text-align:right">${esc(fmtStamp(x.at))}<br>${fmtInt(x.rows)} linhas</span></li>`).join('')}</ul>`,
+    <ul class="hist">${h.map(x => `<li><span><b>${esc(who(x.by))}</b><br><span class="muted">${esc(x.file)}</span></span><span class="muted" style="text-align:right">${esc(fmtStamp(x.at))}<br>${fmtInt(x.rows)} linhas</span></li>`).join('')}</ul>`,
     [{label:'Fechar'}]);
 };
 
 /* ===================== Importação ===================== */
 function applyRole(){
   const ok = canImport();
-  $('#btnImport').hidden = !ok; $('#btnPerms').hidden = !ok;
+  $('#btnImport').hidden = !ok; $('#btnPerms').hidden = !(me && me.isOwner);
   $('#emptyHint').innerHTML = ok ? 'Clique em <b>Atualizar base</b> ou arraste a planilha <b>.xlsx / .xlsm</b> aqui.'
-    : `Ainda não há base. Quem pode importar: <b>${esc(importers().map(i => i.name).join(', '))}</b>.`;
+    : 'Ainda não há base. Só o responsável pelo dashboard e as pessoas que ele autorizar podem importar.';
 }
-$('#btnPerms').onclick = () => {
-  let draft = importers().map(i => ({...i}));
+$('#btnPerms').onclick = async () => {
+  let draft = importers().map(i => ({id: i.id}));
+  await resolveNames(draft.map(i => i.id));
   const render = () => {
-    $('#permList').innerHTML = draft.map((i, n) => `<li><span>${esc(i.name)}${me && i.key === me.key ? ' <span class="muted">(você)</span>' : ''}</span><button class="btn sm" data-rm="${n}">Remover</button></li>`).join('');
+    $('#permList').innerHTML = `<li><span>${esc(me.name)} <span class="muted">(dono, sempre pode)</span></span></li>` +
+      draft.map((i, n) => `<li><span>${esc(who(i.id))}</span><button class="btn sm" data-rm="${n}">Remover</button></li>`).join('');
   };
   modal(`<h3>Quem pode importar a base</h3>
-    <p>Só as pessoas desta lista veem o botão <b>Atualizar base</b>. Elas também precisam ter permissão de edição no claude.ai, dada pelo menu Compartilhar.</p>
+    <p>Pessoas desta lista veem o botão <b>Atualizar base</b>. Elas precisam ter acesso de edição a este dashboard, dado pelo menu Compartilhar do claude.ai.</p>
     <ul class="perm-list" id="permList"></ul>
-    <form class="perm-add" id="permForm"><input id="permName" placeholder="Nome completo da conta" aria-label="Nome completo"><button class="btn sm" type="submit">Adicionar</button></form>
+    <form class="perm-add" id="permForm"><input id="permName" placeholder="Buscar pessoa pelo nome" aria-label="Buscar pessoa" autocomplete="off"><button class="btn sm" type="submit">Buscar</button></form>
+    <ul class="perm-list" id="permHits"></ul>
     <div class="perm-err" id="permErr" role="alert"></div>`,
     [{label:'Cancelar'}, {label:'Salvar lista', cls:'primary', fn: async () => {
-      if (!draft.length) { toast('A lista precisa ter pelo menos uma pessoa.'); return; }
-      stashView();
       try { await S.savePerms(draft); DATA.importers = draft; applyRole(); toast('Lista salva.', 4000); }
-      catch (ex) { console.error(ex); const c = ex && ex.code; try { sessionStorage.removeItem('dd_view'); } catch(_){}
-        toast('Não foi possível salvar a lista. Verifique se você tem acesso de edição a este dashboard no claude.ai.', 7000); }
+      catch (ex) { console.error(ex); toast('Não foi possível salvar a lista agora. Tente de novo em instantes.', 7000); }
     }}]);
   render();
-  $('#permList').onclick = e => { const b = e.target.closest('button[data-rm]'); if (!b) return; draft.splice(+b.dataset.rm, 1); render(); };
-  $('#permForm').onsubmit = e => {
-    e.preventDefault(); const name = $('#permName').value.trim().replace(/\s+/g,' '), key = nameKey(name);
+  let hits = [];
+  const search = async () => {
     $('#permErr').textContent = '';
-    if (name.split(' ').length < 2 || !key) { $('#permErr').textContent = 'Digite o nome completo (nome e sobrenome).'; return; }
-    if (draft.some(i => i.key === key)) { $('#permErr').textContent = 'Essa pessoa já está na lista.'; return; }
-    draft.push({key, name}); $('#permName').value = ''; render();
+    if (!USER) { $('#permErr').textContent = 'A busca de pessoas não está disponível neste acesso.'; return; }
+    try { hits = (await USER.search($('#permName').value.trim())).filter(h => !h.isMe); } catch(_) { hits = []; }
+    hits.forEach(h => { if (h.name) NAMES[h.id] = h.name; });
+    $('#permHits').innerHTML = hits.map((h, n) => `<li><span>${esc(h.name || 'Sem nome')}${h.guest ? ' <span class="muted">(convidado)</span>' : ''}</span>${draft.some(d => d.id === h.id) ? '<span class="muted">na lista</span>' : `<button class="btn sm primary" data-add="${n}">Adicionar</button>`}</li>`).join('')
+      || '<li><span class="muted">Ninguém encontrado. A pessoa precisa ter acesso a este dashboard.</span></li>';
   };
+  $('#permList').onclick = e => { const b = e.target.closest('button[data-rm]'); if (!b) return; draft.splice(+b.dataset.rm, 1); render(); search(); };
+  $('#permHits').onclick = e => { const b = e.target.closest('button[data-add]'); if (!b) return; draft.push({id: hits[+b.dataset.add].id}); render(); search(); };
+  $('#permForm').onsubmit = e => { e.preventDefault(); search(); };
+  search();
 };
 function readFile(file){
   if (!file) return;
@@ -705,7 +656,7 @@ function parseWorkbook(wb, name){
 async function upload(arr, name, sheet, procs){
   const btn = $('#btnImport'); btn.disabled = true;
   const meta = {version: Date.now().toString(36) + Math.random().toString(36).slice(2,6), updatedAt: new Date().toISOString(),
-    updatedBy: me.name, updatedByKey: me.key, fileName: name, sheet, rows: arr.length, procs, cols: ALL_COLS};
+    updatedBy: me.id, fileName: name, sheet, rows: arr.length, procs, cols: ALL_COLS};
   toast('Enviando base…', 60000);
   try {
     await S.saveBase(meta, arr, (i, n) => toast(`Enviando base… ${i}/${n}`, 60000));
@@ -957,7 +908,7 @@ function cellHtml(c, v, row){
 }
 function tratSelect(r){
   const p = String(r['Processo']), v = r[TRAT], saved = TRATS[p], pend = PENDING[p] != null;
-  const tip = pend ? 'Alteração ainda não salva' : saved ? `Alterado por ${saved.by} em ${fmtStamp(saved.at)}` : 'Valor inicial (coluna Setor)';
+  const tip = pend ? 'Alteração ainda não salva' : saved ? `Alterado por ${who(saved.by)} em ${fmtStamp(saved.at)}` : 'Valor inicial (coluna Setor)';
   return `<select class="trat tr-${tratKey(v) || 'vazio'}${pend ? ' pend' : ''}" data-proc="${esc(p)}" title="${esc(tip)}" aria-label="Local de Tratativa do processo ${esc(p)}">${
     TRAT_OPTS.map(o => `<option${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
 }
@@ -979,7 +930,7 @@ $('#btnDiscard').onclick = () => { for (const k in PENDING) delete PENDING[k]; R
 $('#btnSaveTrat').onclick = async () => {
   const btn = $('#btnSaveTrat'); btn.disabled = true;
   const at = new Date().toISOString(), next = Object.assign({}, TRATS);
-  for (const p in PENDING) next[p] = {v: PENDING[p], by: me ? me.name : '', at};
+  for (const p in PENDING) next[p] = {v: PENDING[p], by: me ? me.id : '', at};
   stashView();
   try {
     await S.saveTrat(next, Object.keys(PENDING));
@@ -1049,7 +1000,7 @@ $('#btnExcel').onclick = () => {
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:aoa.length-1, c:REPORT_COLS.length-1}})};
   for (let R = 1; R < aoa.length; R++) REPORT_COLS.forEach((c, C) => { const ref = XLSX.utils.encode_cell({r:R, c:C}); if (ws[ref] && MONEY_COLS.has(c)) ws[ref].z = '"R$" #,##0.00'; });
   const info = XLSX.utils.aoa_to_sheet([['Relatório de Débitos'],['Gerado em', new Date().toLocaleString('pt-BR')],['Gerado por', me ? me.name : ''],
-    ['Base', META ? `${META.fileName} · atualizada em ${fmtStamp(META.updatedAt)} por ${META.updatedBy}` : ''],['Filtros', filterSummary()],
+    ['Base', META ? `${META.fileName} · atualizada em ${fmtStamp(META.updatedAt)} por ${who(META.updatedBy)}` : ''],['Filtros', filterSummary()],
     ['Linhas', rows.length],['Processos únicos', uniqProc(rows)],['Valor Total', sum(rows,'Valor Total')],['Valor Desconto', sum(rows,'Valor Desconto')],['Valor Frete', sum(rows,'Valor Frete')]]);
   info['!cols'] = [{wch:18},{wch:100}];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Relatório'); XLSX.utils.book_append_sheet(wb, info, 'Resumo');
@@ -1064,7 +1015,7 @@ $('#btnPrint').onclick = () => {
   const doc = new J({orientation:'landscape', unit:'mm', format:'a4'});
   doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.text('Relatório de Débitos', 8, 11);
   doc.setFontSize(7.5); doc.setFont(undefined, 'normal');
-  const lines = doc.splitTextToSize(`${META ? `Base: ${META.fileName} · atualizada em ${fmtStamp(META.updatedAt)} por ${META.updatedBy}` : ''} · Gerado em ${new Date().toLocaleString('pt-BR')}${me ? ' por ' + me.name : ''} · ${fmtInt(rows.length)} linhas · ${fmtInt(uniqProc(rows))} processos únicos · Valor Total ${fmtMoney(sum(rows,'Valor Total'))}\nFiltros: ${filterSummary()}`, 280);
+  const lines = doc.splitTextToSize(`${META ? `Base: ${META.fileName} · atualizada em ${fmtStamp(META.updatedAt)} por ${who(META.updatedBy)}` : ''} · Gerado em ${new Date().toLocaleString('pt-BR')}${me ? ' por ' + me.name : ''} · ${fmtInt(rows.length)} linhas · ${fmtInt(uniqProc(rows))} processos únicos · Valor Total ${fmtMoney(sum(rows,'Valor Total'))}\nFiltros: ${filterSummary()}`, 280);
   doc.text(lines, 8, 16);
   const numIdx = {}; REPORT_COLS.forEach((c,i) => { if (NUM_COLS.has(c)) numIdx[i] = {halign:'right'}; });
   doc.autoTable({
@@ -1130,23 +1081,18 @@ $('#empty').onclick = () => { if (canImport()) $('#file').click(); }; $('#empty'
 async function boot(){
   let db = null;
   const inHost = !!(window.claude && typeof window.claude.use === 'function');
-  if (inHost) { try { [db, dl] = await Promise.all([window.claude.use('db'), window.claude.use('downloads')]); } catch(_) { db = null; dl = null; } }
-  if (inHost && !db) {
-    $('#lMode').innerHTML = '<b style="color:var(--danger)">Para acessar o dashboard, clique em “Entrar” no canto superior direito e faça login na sua conta claude.ai.</b> Depois recarregue esta página.';
-    $('#lSubmit').disabled = true; $('#login').hidden = false; return;
+  if (inHost) {
+    try { [db, dl, USER] = await Promise.all([window.claude.use('db'), window.claude.use('downloads'), window.claude.use('user')]); } catch(_) { db = null; }
+    if (!db) { $('#gateMsg').innerHTML = '<b style="color:var(--danger)">Faça login na sua conta claude.ai</b> pelo botão “Entrar”, no canto superior direito. Depois recarregue esta página.'; $('#login').hidden = false; return; }
+    let v = null; try { v = USER ? await USER.me() : null; } catch(_){}
+    S = cloudStore(db);
+    startSession({id: v && v.id, name: (v && v.name) || 'Você', isOwner: !!(v && v.isOwner)});
+    return;
   }
-  S = db ? cloudStore(db) : localStore();
-  $('#lMode').textContent = S.mode === 'local' ? 'Modo local: contas e base ficam salvas apenas neste navegador.' : 'Sua conta vale em qualquer computador que acessar este dashboard.';
-  $('#lSubmit').disabled = false;
-  const sess = lsGet('dd_session');
-  if (sess && sess.key) {
-    try { const acc = await S.getAccount(sess.key); if (acc) { startSession({key: sess.key, name: acc.name}); return; } } catch(_){}
-  }
-  $('#login').hidden = false;
+  S = localStore();
+  startSession({id: 'local', name: 'Você', isOwner: true});
 }
 $('#login').hidden = false;
-$('#lSubmit').disabled = true;
-$('#lMode').textContent = 'Carregando…';
 boot();
 })();
 </script>
