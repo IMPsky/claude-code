@@ -270,7 +270,7 @@ table.rep tfoot td{position:sticky;bottom:0;background:var(--surface-2);font-wei
 
     <section class="charts">
       <div class="chart-card bar-card">
-        <div class="ch"><h3>Processos por DT Lançamento</h3><span class="muted" style="margin-left:auto;font-size:12px">clique na barra para filtrar</span></div>
+        <div class="ch"><h3>Processos por DT Lançamento</h3><span class="muted" style="margin-left:auto;font-size:12px">dias desde o lançamento até hoje · clique na barra para filtrar</span></div>
         <div class="cbox"><canvas id="chBar"></canvas><div class="empty-c" id="emBar" hidden>Sem dados</div></div>
       </div>
       <div class="chart-card">
@@ -370,6 +370,10 @@ function fmtDate(v){
   return s;
 }
 const dateKey = s => { const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+/* Dias corridos entre a data (dd/mm/aaaa) e hoje */
+const daysSince = s => { const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (!m) return null;
+  const t = new Date(); return Math.round((Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) - Date.UTC(+m[3], +m[2]-1, +m[1])) / 86400000); };
+const daysTxt = d => d == null ? '' : d === 1 ? '1 dia' : `${fmtInt(d)} dias`;
 const cell = v => (v == null ? '' : String(v).trim());
 const display = (col, v) => v === '' ? '(vazio)' : (MONEY_COLS.has(col) ? fmtMoney(+v) : NUM_COLS.has(col) ? fmtNum(+v) : String(v));
 
@@ -754,14 +758,20 @@ function renderCharts(){
   $('#emBar').hidden = keys.length > 0;
   upsert('bar', '#chBar', {
     type:'bar',
-    data:{labels: keys.map(k => k || '(vazio)'), datasets:[{label:'Processos', data, backgroundColor: keys.map(k => sel.size && !sel.has(k) ? cssVar('--border') : accent), borderRadius:5, maxBarThickness:46}]},
+    data:{labels: keys.map(k => k ? [k, daysTxt(daysSince(k))] : '(vazio)'), datasets:[{label:'Processos', data, backgroundColor: keys.map(k => sel.size && !sel.has(k) ? cssVar('--border') : accent), borderRadius:5, maxBarThickness:46}]},
     options:{responsive:true, maintainAspectRatio:false, animation:{duration:250},
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c => ` ${fmtInt(c.raw)} processo(s) · ${fmtMoney(m.get(keys[c.dataIndex]).v)}`}}},
+      plugins:{legend:{display:false}, tooltip:{callbacks:{title: it => keys[it[0].dataIndex] || '(vazio)', label:c => ` ${fmtInt(c.raw)} processo(s) · ${fmtMoney(m.get(keys[c.dataIndex]).v)}`, afterLabel: c => { const d = daysSince(keys[c.dataIndex]); return d == null ? '' : ` ${daysTxt(d)} desde o lançamento`; }}}},
       scales:{y:{beginAtZero:true, grace:'12%', ticks:{precision:0}, grid:{color:cssVar('--border')}}, x:{grid:{display:false}}},
       onClick:(_e, els) => { if (els.length) toggleFilter('DT Lançamento', keys[els[0].index]); },
       onHover:(e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }},
     plugins:[{id:'lbl', afterDatasetsDraw(ch){ const {ctx} = ch; ctx.save(); ctx.fillStyle = cssVar('--text'); ctx.font = '600 11.5px "Source Sans 3", system-ui'; ctx.textAlign = 'center';
-      ch.getDatasetMeta(0).data.forEach((b,i) => ctx.fillText(fmtInt(data[i]), b.x, b.y-5)); ctx.restore(); }}]
+      ch.getDatasetMeta(0).data.forEach((b,i) => {
+        ctx.fillStyle = cssVar('--text'); ctx.font = '600 11.5px "Source Sans 3", system-ui'; ctx.fillText(fmtInt(data[i]), b.x, b.y-5);
+        const d = daysSince(keys[i]); if (d == null) return;
+        const h = b.base - b.y, w = b.width;
+        if (h >= 34 && w >= 24) { ctx.fillStyle = '#fff'; ctx.font = '700 12px "Barlow Semi Condensed", system-ui'; ctx.fillText(fmtInt(d), b.x, b.base - 18);
+          ctx.font = '600 9.5px "Source Sans 3", system-ui'; ctx.fillText(d === 1 ? 'dia' : 'dias', b.x, b.base - 7); }
+      }); ctx.restore(); }}]
   });
   donut('desc', '#chDesc', '#emDesc', 'Valor Desconto', $('#grpDesc').value);
   donut('deb', '#chDeb', '#emDeb', 'Valor Debito', $('#grpDeb').value);
