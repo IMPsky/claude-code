@@ -454,33 +454,57 @@ async function hashPass(pass, saltB64){
 }
 
 /* ===================== Armazenamento ===================== */
-function pageStore(art){
-  const accts = () => Object.assign({}, lsGet('dd_accounts') || {}, DATA.accounts || {});
-  const publishData = async data => { if (!art) throw {code:'not_granted'}; await art.publish(buildDoc(data)); };
+function cloudStore(db){
+  const safeId = v => String(v).replace(/[^A-Za-z0-9_\-.~:@+]/g, '_').slice(0, 180) || '_';
   return {
-    mode: art ? 'page' : 'readonly',
-    async getAccount(key){ return accts()[key] || null; },
+    mode:'cloud',
+    async getAccount(key){ const d = await db.doc('accounts/' + key).get(); return d.exists ? d.data() : null; },
     async createAccount(key, acc){
-      if (accts()[key]) return false;
-      if (art) {
-        lsSet('dd_session', {key, name: acc.name});
-        try { await publishData(Object.assign({}, DATA, {accounts: Object.assign({}, DATA.accounts || {}, {[key]: acc})})); return true; }
-        catch (e) { if (!(e && READONLY.has(e.code))) { lsSet('dd_session', null); throw e; } }
-      }
-      const l = lsGet('dd_accounts') || {}; l[key] = acc; lsSet('dd_accounts', l); return 'local';
+      const ref = db.doc('accounts/' + key);
+      const lease = await ref.acquire({holder: key + ':' + Math.random().toString(36).slice(2), ttlMs: 5000});
+      if (!lease.acquired) return false;
+      const d = await ref.get();
+      if (d.exists && d.data().hash) return false;
+      await ref.set(acc); return true;
     },
-    watchMeta(fn){ TRATS = DATA.trat || {}; setTimeout(() => fn(DATA.meta || null, {fromCache:false}), 0); return () => {}; },
-    async loadRows(){ return DATA.rows || []; },
-    async saveTrat(trat){ await publishData(Object.assign({}, DATA, {trat})); },
-    async savePerms(list){ await publishData(Object.assign({}, DATA, {importers: list})); },
-    async saveBase(meta, rowsArr){
-      meta.chunks = 1;
-      meta.history = [{at: meta.updatedAt, by: meta.updatedBy, file: meta.fileName, rows: meta.rows, procs: meta.procs}, ...((DATA.meta && DATA.meta.history) || [])].slice(0, 20);
-      stashView();
-      const trat = Object.assign({}, DATA.trat || {}); const at = new Date().toISOString();
-      for (const p in PENDING) trat[p] = {v: PENDING[p], by: me ? me.name : '', at};
-      await publishData(Object.assign({}, DATA, {meta, rows: rowsArr, trat}));
-    }
+    watchMeta(fn, err){
+      db.collection('trat').onSnapshot(snap => {
+        const m = {}; snap.docs.forEach(d => { const x = d.data(); if (x && x.p != null) m[String(x.p)] = x; });
+        TRATS = m; if (ROWS.length) { ROWS.forEach(enrich); refresh(true); }
+      }, e => console.error(e));
+      db.doc('state/importers').onSnapshot(d => {
+        const x = d.exists ? d.data() : null;
+        DATA.importers = x && Array.isArray(x.list) ? x.list : undefined; if (me) applyRole();
+      }, e => console.error(e));
+      return db.doc('base/meta').onSnapshot(d => fn(d.exists ? d.data() : null, d.metadata), err);
+    },
+    async loadRows(meta){
+      const snap = await db.collection('chunks').where('version','==',meta.version).get();
+      const parts = snap.docs.map(d => d.data()).sort((a,b) => a.i - b.i);
+      if (parts.length !== meta.chunks) throw new Error('A base ainda está sendo enviada. Aguarde alguns segundos.');
+      return parts.flatMap(x => JSON.parse(x.data));
+    },
+    async saveBase(meta, rowsArr, onProgress){
+      const chunks = []; let cur = [], len = 0;
+      for (const r of rowsArr) { const t = JSON.stringify(r); if (len + t.length > CHUNK_CHARS && cur.length) { chunks.push(cur); cur = []; len = 0; } cur.push(r); len += t.length + 1; }
+      if (cur.length) chunks.push(cur);
+      for (let i = 0; i < chunks.length; i++) {
+        await db.doc(`chunks/${meta.version}-${i}`).set({version: meta.version, i, data: JSON.stringify(chunks[i])});
+        onProgress && onProgress(i+1, chunks.length);
+      }
+      const prev = await db.doc('base/meta').get();
+      const old = prev.exists ? prev.data() : null;
+      meta.chunks = chunks.length;
+      meta.history = [{at: meta.updatedAt, by: meta.updatedBy, file: meta.fileName, rows: meta.rows, procs: meta.procs}, ...((old && old.history) || [])].slice(0, 20);
+      await db.doc('base/meta').set(meta);
+      if (old && old.version) {
+        try { const o = await db.collection('chunks').where('version','==',old.version).get(); for (const d of o.docs) await db.doc('chunks/' + d.id).delete(); } catch(_){}
+      }
+    },
+    async saveTrat(next, changed){
+      for (const p of changed || Object.keys(next)) { const x = next[p]; await db.doc('trat/' + safeId(p)).set({p: String(p), v: x.v, by: x.by, at: x.at}); }
+    },
+    async savePerms(list){ await db.doc('state/importers').set({list}); }
   };
 }
 function localStore(){
@@ -549,7 +573,8 @@ $('#loginForm').addEventListener('submit', async e => {
     console.error(ex);
     err.textContent = ex && ex.code === 'conflict' ? 'Outra pessoa salvou ao mesmo tempo. A página vai recarregar; tente de novo em seguida.'
       : ex && ex.code === 'rate_limited' ? 'Muitas alterações seguidas. Aguarde um minuto e tente de novo.'
-      : 'Não foi possível criar a conta agora. Tente de novo em instantes.';
+      : ex && ex.code === 'quota_exceeded' ? 'O armazenamento do dashboard está cheio. Avise o responsável.'
+      : 'Não foi possível criar a conta. Verifique se você tem acesso de edição a este dashboard no claude.ai.';
   } finally { btn.disabled = false; btn.textContent = label; }
 });
 function startSession(u){
@@ -628,9 +653,9 @@ $('#btnPerms').onclick = () => {
     [{label:'Cancelar'}, {label:'Salvar lista', cls:'primary', fn: async () => {
       if (!draft.length) { toast('A lista precisa ter pelo menos uma pessoa.'); return; }
       stashView();
-      try { await S.savePerms(draft); DATA.importers = draft; applyRole(); toast(S.mode === 'local' ? 'Lista salva.' : 'Lista salva. Atualizando a página para todos…', 5000); }
+      try { await S.savePerms(draft); DATA.importers = draft; applyRole(); toast('Lista salva.', 4000); }
       catch (ex) { console.error(ex); const c = ex && ex.code; try { sessionStorage.removeItem('dd_view'); } catch(_){}
-        toast(c && READONLY.has(c) ? 'Só quem tem permissão de edição no claude.ai pode salvar a lista.' : c === 'conflict' ? 'Outra pessoa salvou ao mesmo tempo. A página vai recarregar.' : 'Não foi possível salvar a lista agora.', 7000); }
+        toast('Não foi possível salvar a lista. Verifique se você tem acesso de edição a este dashboard no claude.ai.', 7000); }
     }}]);
   render();
   $('#permList').onclick = e => { const b = e.target.closest('button[data-rm]'); if (!b) return; draft.splice(+b.dataset.rm, 1); render(); };
@@ -684,16 +709,14 @@ async function upload(arr, name, sheet, procs){
   toast('Enviando base…', 60000);
   try {
     await S.saveBase(meta, arr, (i, n) => toast(`Enviando base… ${i}/${n}`, 60000));
-    toast(S.mode === 'local' ? `Base atualizada: ${fmtInt(arr.length)} linhas, ${fmtInt(procs)} processos.` : 'Base salva. Atualizando a página para todos…', 6000);
+    toast(`Base atualizada para todos: ${fmtInt(arr.length)} linhas, ${fmtInt(procs)} processos.`, 6000);
   } catch (ex) {
     console.error(ex);
     const c = ex && ex.code;
-    toast(c && READONLY.has(c) ? 'Só quem tem permissão de edição neste dashboard (e está logado no claude.ai) pode atualizar a base.'
-      : c === 'conflict' ? 'Outra pessoa atualizou a base ao mesmo tempo. A página vai recarregar com a versão mais nova.'
-      : c === 'too_large' ? 'A planilha é grande demais para guardar na página. Filtre as linhas ou divida o arquivo.'
-      : c === 'rate_limited' ? 'Muitas atualizações seguidas. Aguarde um minuto e tente de novo.'
+    toast(c === 'quota_exceeded' ? 'O armazenamento do dashboard está cheio. Avise o responsável.'
+      : c === 'resource_exhausted' ? 'Muitas gravações seguidas. Aguarde um minuto e tente de novo.'
       : ex && ex.message && S.mode === 'local' ? ex.message
-      : 'Não foi possível atualizar a base agora. Tente de novo em instantes.', 7000);
+      : 'Não foi possível atualizar a base. Verifique se você tem acesso de edição a este dashboard no claude.ai.', 7000);
   } finally { btn.disabled = false; }
 }
 
@@ -959,16 +982,14 @@ $('#btnSaveTrat').onclick = async () => {
   for (const p in PENDING) next[p] = {v: PENDING[p], by: me ? me.name : '', at};
   stashView();
   try {
-    await S.saveTrat(next);
+    await S.saveTrat(next, Object.keys(PENDING));
     TRATS = next; for (const k in PENDING) delete PENDING[k]; ROWS.forEach(enrich); refresh(); updateSavebar();
-    toast(S.mode === 'local' ? 'Alterações salvas.' : 'Alterações salvas. Atualizando a página para todos…', 5000);
+    toast('Alterações salvas para todos.', 4000);
   } catch (ex) {
     console.error(ex); const c = ex && ex.code;
     try { sessionStorage.removeItem('dd_view'); } catch(_){}
-    toast(c && READONLY.has(c) ? 'Só quem tem permissão de edição neste dashboard (e está logado no claude.ai) pode salvar alterações.'
-      : c === 'conflict' ? 'Outra pessoa salvou ao mesmo tempo. A página vai recarregar; refaça as alterações.'
-      : c === 'rate_limited' ? 'Muitas gravações seguidas. Aguarde um minuto e tente de novo.'
-      : 'Não foi possível salvar agora. Tente de novo em instantes.', 7000);
+    toast(c === 'resource_exhausted' ? 'Muitas gravações seguidas. Aguarde um minuto e tente de novo.'
+      : 'Não foi possível salvar. Verifique se você tem acesso de edição a este dashboard no claude.ai.', 7000);
   } finally { btn.disabled = false; }
 };
 /* Mantém filtros e página depois que a página recarrega com os dados novos */
@@ -1107,11 +1128,15 @@ $('#empty').onclick = () => { if (canImport()) $('#file').click(); }; $('#empty'
 
 /* ===================== Inicialização ===================== */
 async function boot(){
-  let art = null;
+  let db = null;
   const inHost = !!(window.claude && typeof window.claude.use === 'function');
-  if (inHost) { try { [art, dl] = await Promise.all([window.claude.use('artifact'), window.claude.use('downloads')]); } catch(_) { art = null; dl = null; } }
-  S = inHost ? pageStore(art) : localStore();
-  $('#lMode').textContent = S.mode === 'local' ? 'Modo local: contas e base ficam salvas apenas neste navegador.' : '';
+  if (inHost) { try { [db, dl] = await Promise.all([window.claude.use('db'), window.claude.use('downloads')]); } catch(_) { db = null; dl = null; } }
+  if (inHost && !db) {
+    $('#lMode').innerHTML = '<b style="color:var(--danger)">Para acessar o dashboard, clique em “Entrar” no canto superior direito e faça login na sua conta claude.ai.</b> Depois recarregue esta página.';
+    $('#lSubmit').disabled = true; $('#login').hidden = false; return;
+  }
+  S = db ? cloudStore(db) : localStore();
+  $('#lMode').textContent = S.mode === 'local' ? 'Modo local: contas e base ficam salvas apenas neste navegador.' : 'Sua conta vale em qualquer computador que acessar este dashboard.';
   $('#lSubmit').disabled = false;
   const sess = lsGet('dd_session');
   if (sess && sess.key) {
