@@ -234,7 +234,8 @@ select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
   #printArea{display:block!important;font-size:7.5px;color:#000}
   #printArea table{border-collapse:collapse;width:100%}
   #printArea th,#printArea td{border:1px solid #999;padding:2px 3px;text-align:left}
-  #printArea td.num{text-align:right}
+  #printArea td.n,#printArea th.n{text-align:right}
+  #printArea .tip{display:none}
 }
 </style>
 
@@ -321,7 +322,7 @@ select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
         <div class="sp">
           <button class="btn sm" id="btnPrint">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M6 14h12v7H6z"/></svg>
-            Imprimir (PDF)</button>
+            Imprimir</button>
           <button class="btn sm ok" id="btnExcel">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3h16v-3"/></svg>
             Baixar Excel</button>
@@ -849,19 +850,40 @@ function renderCharts(){
   $('#emBar').hidden = keys.length > 0;
   upsert('bar', '#chBar', {
     type:'bar',
-    data:{labels: keys.map(k => k ? [k, daysTxt(daysSince(k))] : '(vazio)'), datasets:[{label:'Processos', data, backgroundColor: keys.map(k => sel.size && !sel.has(k) ? cssVar('--border') : accent), borderRadius:5, maxBarThickness:46}]},
+    data:{labels: keys.map(k => k || '(vazio)'), datasets:[{label:'Processos', data, backgroundColor: keys.map(k => sel.size && !sel.has(k) ? cssVar('--border') : accent), borderRadius:5, maxBarThickness:46}]},
     options:{responsive:true, maintainAspectRatio:false, animation:{duration:250},
       plugins:{legend:{display:false}, tooltip:{callbacks:{title: it => keys[it[0].dataIndex] || '(vazio)', label:c => ` ${fmtInt(c.raw)} processo(s) · ${fmtMoney(m.get(keys[c.dataIndex]).v)}`, afterLabel: c => { const d = daysSince(keys[c.dataIndex]); return d == null ? '' : ` ${daysTxt(d)} desde o lançamento`; }}}},
-      scales:{y:{beginAtZero:true, grace:'12%', ticks:{precision:0}, grid:{color:cssVar('--border')}}, x:{grid:{display:false}}},
+      scales:{y:{beginAtZero:true, grace:'12%', ticks:{precision:0}, grid:{color:cssVar('--border')}}, x:{grid:{display:false}, ticks:{display:false}}}, layout:{padding:{bottom:40}},
       onClick:(_e, els) => { if (els.length) toggleFilter('DT Lançamento', keys[els[0].index]); },
       onHover:(e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }},
-    plugins:[{id:'lbl', afterDatasetsDraw(ch){ const {ctx} = ch; ctx.save(); ctx.fillStyle = cssVar('--text'); ctx.font = '600 11.5px "Source Sans 3", system-ui'; ctx.textAlign = 'center';
+    plugins:[{id:'xpills', afterDraw(ch){
+      /* datas embaixo das barras: texto branco sobre etiqueta escura, legível em qualquer tema */
+      const {ctx, chartArea} = ch, bars = ch.getDatasetMeta(0).data; if (!bars.length) return;
+      const multiYear = new Set(keys.map(x => x.slice(6))).size > 1;
+      const slot = bars.length > 1 ? Math.abs(bars[1].x - bars[0].x) : chartArea.width;
+      const w = Math.max(30, Math.min(slot - 3, multiYear ? 66 : 48)), h = 32, y = chartArea.bottom + 6;
+      const step = Math.max(1, Math.ceil((multiYear ? 60 : 42) / slot));
+      ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      bars.forEach((b, i) => {
+        if (i % step) return;
+        const k = keys[i] || '', x = b.x - w/2;
+        ctx.fillStyle = 'rgba(24,33,47,.92)'; ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, w, h, 6); else ctx.rect(x, y, w, h); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 11px "Source Sans 3", system-ui'; ctx.fillText(k ? (multiYear ? k : k.slice(0,5)) : '(vazio)', b.x, y + 10);
+        const d = daysSince(k); ctx.font = '600 10px "Source Sans 3", system-ui'; if (d != null) ctx.fillText(daysTxt(d), b.x, y + 23);
+      });
+      ctx.restore();
+    }}, {id:'lbl', afterDatasetsDraw(ch){ const {ctx} = ch; ctx.save(); ctx.fillStyle = cssVar('--text'); ctx.font = '600 11.5px "Source Sans 3", system-ui'; ctx.textAlign = 'center';
       ch.getDatasetMeta(0).data.forEach((b,i) => {
         ctx.fillStyle = cssVar('--text'); ctx.font = '600 11.5px "Source Sans 3", system-ui'; ctx.fillText(fmtInt(data[i]), b.x, b.y-5);
         const d = daysSince(keys[i]); if (d == null) return;
         const h = b.base - b.y, w = b.width;
-        if (h >= 34 && w >= 24) { ctx.fillStyle = cssVar('--accent-ink'); ctx.font = '700 12px "Barlow Semi Condensed", system-ui'; ctx.fillText(fmtInt(d), b.x, b.base - 18);
-          ctx.font = '600 9.5px "Source Sans 3", system-ui'; ctx.fillText(d === 1 ? 'dia' : 'dias', b.x, b.base - 7); }
+        if (h >= 34 && w >= 24) {
+          /* texto branco com contorno escuro fino: legível em qualquer cor de barra */
+          const label = (txt, y) => { ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.strokeText(txt, b.x, y); ctx.fillStyle = '#ffffff'; ctx.fillText(txt, b.x, y); };
+          ctx.font = '700 12.5px "Barlow Semi Condensed", system-ui'; label(fmtInt(d), b.base - 18);
+          ctx.font = '700 9.5px "Source Sans 3", system-ui'; label(d === 1 ? 'dia' : 'dias', b.base - 7); }
       }); ctx.restore(); }}]
   });
   donut('desc', '#chDesc', '#emDesc', 'Valor Desconto', $('#grpDesc').value);
@@ -1016,27 +1038,44 @@ $('#btnExcel').onclick = () => {
   const blob = new Blob([XLSX.write(wb, {bookType:'xlsx', type:'array'})], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   offer(name, blob, () => XLSX.writeFile(wb, name));
 };
-$('#btnPrint').onclick = () => {
+/* Imprimir: gera o relatório pronto para folha A4; ao abrir o arquivo, a janela de impressão abre sozinha */
+function printDoc(rows){
+  const head = REPORT_COLS.map(c => `<th${NUM_COLS.has(c) ? ' class="n"' : ''}>${esc(c)}</th>`).join('');
+  const body = rows.map(r => `<tr>${REPORT_COLS.map(c => NUM_COLS.has(c) ? `<td class="n">${MONEY_COLS.has(c) ? fmtMoney(r[c]) : fmtNum(r[c])}</td>` : `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('');
+  const foot = footVals(rows).map((v,i) => `<td${NUM_COLS.has(REPORT_COLS[i]) ? ' class="n"' : ''}>${esc(v)}</td>`).join('');
+  const info = `${META ? `Base: ${esc(META.fileName)} · atualizada em ${esc(fmtStamp(META.updatedAt))} por ${esc(who(META.updatedBy))} · ` : ''}Impresso em ${esc(new Date().toLocaleString('pt-BR'))}${me ? ' por ' + esc(me.name) : ''}`;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de Débitos</title><style>
+@page{size:A4 landscape;margin:8mm}
+*{box-sizing:border-box}body{margin:0;font:7px/1.3 Arial,Helvetica,sans-serif;color:#000;background:#fff}
+h1{font-size:14px;margin:0 0 2px}.meta{font-size:8px;margin:0 0 2px;color:#222}.sum{font-size:8.5px;margin:0 0 6px}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid #888;padding:2px 3px;text-align:left;vertical-align:top}
+th{background:#e6e9ee;font-size:6.6px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+td.n,th.n{text-align:right;white-space:nowrap}thead{display:table-header-group}tfoot td{font-weight:bold;background:#f1f3f6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+tr{page-break-inside:avoid}.tip{font:13px Arial,sans-serif;background:#fff6dc;border:1px solid #e8c766;padding:8px 12px;margin:0 0 10px;border-radius:6px}
+@media print{.tip{display:none}}
+</style></head><body>
+<div class="tip">Se a janela de impressão não abrir sozinha, pressione <b>Ctrl+P</b>.</div>
+<h1>Relatório de Débitos</h1>
+<p class="meta">${info}</p>
+<p class="meta">Filtros: ${esc(filterSummary())}</p>
+<p class="sum"><b>${fmtInt(uniqProc(rows))}</b> processos únicos · ${fmtInt(rows.length)} linhas · Valor Total <b>${fmtMoney(sum(rows,'Valor Total'))}</b></p>
+<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody><tfoot><tr>${foot}</tr></tfoot></table>
+<script>addEventListener('load',function(){setTimeout(function(){window.print()},300)});<\/script>
+</body></html>`;
+}
+$('#btnPrint').onclick = async () => {
   const rows = sortedRows(); if (!rows.length) { toast('Nada para imprimir.'); return; }
-  const J = window.jspdf && window.jspdf.jsPDF;
-  if (!J) { toast('Gerador de PDF indisponível. Verifique a conexão.'); return; }
-  const doc = new J({orientation:'landscape', unit:'mm', format:'a4'});
-  doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.text('Relatório de Débitos', 8, 11);
-  doc.setFontSize(7.5); doc.setFont(undefined, 'normal');
-  const lines = doc.splitTextToSize(`${META ? `Base: ${META.fileName} · atualizada em ${fmtStamp(META.updatedAt)} por ${who(META.updatedBy)}` : ''} · Gerado em ${new Date().toLocaleString('pt-BR')}${me ? ' por ' + me.name : ''} · ${fmtInt(rows.length)} linhas · ${fmtInt(uniqProc(rows))} processos únicos · Valor Total ${fmtMoney(sum(rows,'Valor Total'))}\nFiltros: ${filterSummary()}`, 280);
-  doc.text(lines, 8, 16);
-  const numIdx = {}; REPORT_COLS.forEach((c,i) => { if (NUM_COLS.has(c)) numIdx[i] = {halign:'right'}; });
-  doc.autoTable({
-    startY: 16 + lines.length * 3.2 + 2, margin:{left:6, right:6}, theme:'grid',
-    head:[REPORT_COLS], foot:[footVals(rows)], showFoot:'lastPage',
-    body: rows.map(r => REPORT_COLS.map(c => MONEY_COLS.has(c) ? fmtMoney(r[c]) : NUM_COLS.has(c) ? fmtNum(r[c]) : String(r[c] ?? ''))),
-    styles:{fontSize:5.2, cellPadding:0.8, overflow:'linebreak', lineColor:[200,205,212], lineWidth:0.1},
-    headStyles:{fillColor:[31,95,209], textColor:255, fontSize:5.2}, footStyles:{fillColor:[235,238,243], textColor:20},
-    columnStyles:{...numIdx, [REPORT_COLS.indexOf('Descrição')]:{cellWidth:28}},
-    didDrawPage: d => { doc.setFontSize(6.5); doc.text(`Página ${d.pageNumber}`, 290, 205, {align:'right'}); }
-  });
-  const name = stampName('pdf');
-  offer(name, doc.output('blob'), () => doc.save(name));
+  if (!dl) { // fora do claude.ai a impressão direta funciona
+    $('#printArea').innerHTML = printDoc(rows).replace(/^[\s\S]*<body>|<script[\s\S]*$/g, '');
+    window.print(); return;
+  }
+  try {
+    await dl.save({filename: stampName('html').replace('Relatorio_Debitos', 'Imprimir_Relatorio_Debitos'), data: printDoc(rows)});
+    toast('Abra o arquivo salvo: a janela de impressão abre sozinha.', 7000);
+  } catch (e) {
+    if (e && e.code === 'declined') return;
+    toast(e && e.code === 'rate_limited' ? 'Já há um arquivo aguardando confirmação.' : 'Não foi possível gerar o relatório para impressão neste acesso.');
+  }
 };
 
 /* ===================== Eventos gerais ===================== */
