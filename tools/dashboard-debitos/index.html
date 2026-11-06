@@ -273,7 +273,7 @@ select.trat.pend{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
     <input type="file" id="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
     <button class="btn" id="btnPerms" hidden title="Quem pode importar a base"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 11l2 2 3.5-3.5"/></svg>Permissões</button>
     <button class="btn" id="btnTheme" title="Escolher tema de cores" aria-label="Escolher tema de cores" aria-haspopup="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
-    <div class="who"><div class="avatar" id="avatar"></div><span class="nm" id="whoName"></span></div>
+    <div class="who"><div class="avatar" id="avatar"></div><span class="nm" id="whoName"></span><button class="btn sm" id="btnLogout" title="Sair da conta">Sair</button></div>
   </header>
 
   <section class="loading" id="loading">Carregando a base compartilhada…</section>
@@ -523,6 +523,14 @@ async function refreshNames(){
   await resolveNames([META && META.updatedBy, ...((META && META.history) || []).map(h => h.by), ...Object.values(TRATS).map(t => t.by), ...importers().map(i => i.id)]);
   renderStamp(); if (ROWS.length) renderTable();
 }
+$('#btnLogout').onclick = () => modal(`<h3>Sair da conta</h3>
+    <p>O acesso ao dashboard usa a sua conta do claude.ai. Para sair:</p>
+    <ol style="margin:8px 0 0;padding-left:20px;line-height:1.7">
+      <li>Abra o <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>.</li>
+      <li>Clique no seu nome ou na sua foto, no canto inferior esquerdo.</li>
+      <li>Escolha <b>Sair</b> (Log out).</li>
+    </ol>
+    <p style="margin-top:10px">Depois disso, quem abrir este link neste computador vai precisar entrar de novo.</p>`, [{label:'Fechar', cls:'primary'}]);
 function startSession(u){
   me = u; if (u.id) NAMES[u.id] = u.name;
   $('#login').hidden = true; $('#main').hidden = false;
