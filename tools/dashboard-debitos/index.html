@@ -4,8 +4,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style id="dd-style">
 /* Layout: cabeçalho fixo sobre a foto do porto; painéis sólidos empilhados (filtros → cards → gráficos → relatório) */
 :root{
@@ -381,7 +379,7 @@ const TRAT_OPTS = ['Retorno','Controle','Distribuição','Transportadora'];
 /* Quem pode importar a base (além de precisar de permissão de edição no claude.ai) */
 /* O dono do dashboard sempre pode; os demais, se estiverem na lista que o dono mantém */
 const importers = () => Array.isArray(DATA.importers) ? DATA.importers.filter(i => i && i.id) : [];
-const canImport = () => !!me && !!me.id && (me.isOwner || importers().some(i => i.id === me.id));
+const canImport = () => !!me && !!me.id && ((S && S.mode === 'local') || me.isOwner || importers().some(i => i.id === me.id));
 const ALL_COLS = [...REPORT_COLS.filter(c => c !== TRAT), 'Valor Debito'];
 const NUM_COLS = new Set(['Qtd','Valor Unitario','Valor Desconto','Valor Frete','Valor Total','Valor Debito']);
 const MONEY_COLS = new Set(['Valor Unitario','Valor Desconto','Valor Frete','Valor Total','Valor Debito']);
@@ -565,7 +563,9 @@ function renderStamp(){
   const b = $('#upd');
   if (!META) { b.classList.add('none'); $('#updTxt').textContent = 'Nenhuma base importada'; return; }
   b.classList.remove('none');
-  $('#updTxt').innerHTML = `Atualizado em <b>${esc(fmtStamp(META.updatedAt))}</b> por <b>${esc(who(META.updatedBy))}</b>`;
+  $('#updTxt').innerHTML = S && S.mode === 'local'
+    ? `Base <b>${esc(META.fileName)}</b> · importada em <b>${esc(fmtStamp(META.updatedAt))}</b>`
+    : `Atualizado em <b>${esc(fmtStamp(META.updatedAt))}</b> por <b>${esc(who(META.updatedBy))}</b>`;
 }
 function showState(s){ $('#loading').hidden = s !== 'loading'; $('#empty').hidden = s !== 'empty'; $('#app').hidden = s !== 'app'; }
 /* Local de Tratativa: valor salvo por processo; sem valor salvo, vem do Setor */
@@ -1065,9 +1065,13 @@ tr{page-break-inside:avoid}.tip{font:13px Arial,sans-serif;background:#fff6dc;bo
 }
 $('#btnPrint').onclick = async () => {
   const rows = sortedRows(); if (!rows.length) { toast('Nada para imprimir.'); return; }
-  if (!dl) { // fora do claude.ai a impressão direta funciona
-    $('#printArea').innerHTML = printDoc(rows).replace(/^[\s\S]*<body>|<script[\s\S]*$/g, '');
-    window.print(); return;
+  if (!dl) { // fora do claude.ai: imprime direto, por um quadro invisível com o relatório
+    const fr = document.createElement('iframe');
+    fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(fr);
+    fr.srcdoc = printDoc(rows).replace(/<script>[\s\S]*?<\/script>/, '');
+    fr.onload = () => { fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(() => fr.remove(), 60000); };
+    return;
   }
   try {
     await dl.save({filename: stampName('html').replace('Relatorio_Debitos', 'Imprimir_Relatorio_Debitos'), data: printDoc(rows)});
@@ -1137,7 +1141,8 @@ async function boot(){
     return;
   }
   S = localStore();
-  startSession({id: 'local', name: 'Você', isOwner: true});
+  startSession({id: 'local', name: 'Você', isOwner: false});
+  $('.who').hidden = true;
 }
 $('#login').hidden = false;
 boot();
